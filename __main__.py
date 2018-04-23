@@ -174,27 +174,30 @@ def generation_pq_approved_hash(L, N, seedlen):
         return status, p, q, domain_parameter_seed, counter
 
     # Now we can return to the generation process
-    n = math.ceil(L / outlen) - 1
-    b = L - 1 - (n * outlen)
-    domain_parameter_seed = secrets.randbits(seedlen)
-    U = hash(domain_parameter_seed) % pow(2, N - 1)
-    q = pow(2, N - 1) + U + 1 - (U % 2)
-    # TODO: Test primality of q with Appendix C.3
-    # TODO: If q not a prime GOTO step 5
-    offset = 1
-    for counter in range(4L):
-        for j in range(n):
-            Vj = hash((domain_parameter_seed + offset + j) % pow(2, seedlen))
-            # TODO: W parameter
-            X = W + pow(2, L - 1)
-            c = X % (2 * q)
-            p = X - (c - 1)
-            if p < pow(2, L - 1):
-                offset = offset + n + 1
-            # TODO: Test primality of p with Appendix C.3 if p is prime return p,q
-            # TODO: step 12: GOTO step 5
-
-    print (status)
+    while True:
+        n = math.ceil(L / outlen) - 1
+        b = L - 1 - (n * outlen)
+        domain_parameter_seed = secrets.randbits(seedlen)
+        U = hash(domain_parameter_seed) % (1 << (N - 1))
+        q = (1 << (N - 1)) + U + 1 - (U % 2)
+        offset = 1
+        if primality_test(q):
+            for counter in range(4*L):
+                V = []
+                W = 0
+                for j in range(n):
+                    V.append(hash((domain_parameter_seed + offset + j) % (1 << (seedlen))))
+                    W = W + V[j] * (1 << (j * outlen))
+                V.append(hash((domain_parameter_seed + offset + n) % (1 << (seedlen))))
+                W = W + (V[n] % (1 << (b))) * (1 << (n * outlen))
+                X = W + (1 << (L - 1))
+                c = X % (2 * q)
+                p = X - (c - 1)
+                if p < (1 << (L - 1)):
+                    offset = offset + n + 1
+                else:
+                    if primality_test(p):
+                        return "VALID", p, q, domain_parameter_seed, counter
 
 # DSA Signature Validation
 def dsa_signature_validation(l_bits, n_bits):
@@ -232,7 +235,7 @@ def main(argv):
     #signature_validation = dsa_signature_validation(l_bits, n_bits)
     #print (signature_validation)
     #print(st_random_prime(256, 0))
-    print (generation_pq_approved_hash(1,1,1))
+    print (generation_pq_approved_hash(1024,160,256))
 
 # Standard main call
 if __name__ == '__main__':
